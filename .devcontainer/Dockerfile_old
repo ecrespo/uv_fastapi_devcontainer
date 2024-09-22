@@ -1,0 +1,39 @@
+FROM python:3.12-slim-bookworm AS builder
+LABEL maintainer="Ernesto Crespo <ecrespo@gmain.com>"
+
+WORKDIR /opt
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+
+RUN apt-get update && apt-get -y install gcc \
+    musl-dev \
+    libffi-dev  \
+    python3-dev \
+    openssl  \
+    procps \
+    pipx \
+    ca-certificates \
+    rustc \
+    cargo \
+
+RUN pipx install uv
+
+
+FROM mcr.microsoft.com/vscode/devcontainers/base:bookworm
+
+ENV CARGO_HOME="/opt/.cargo/bin"
+ENV PATH="$CARGO_HOME/:$PATH"
+
+ENV PYTHONUNBUFFERED=True
+ENV UV_LINK_MODE=copy
+
+WORKDIR /opt
+
+COPY --from=builder /root/.cargo/bin/uv $CARGO_HOME/uv
+COPY ./.python-version ./
+COPY ./pyproject.toml ./
+COPY ./uv.lock ./
+
+
+RUN uv python pin "$(cat .python-version)"
+
+RUN uv sync
