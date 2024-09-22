@@ -37,13 +37,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Reset the entrypoint, don't invoke `uv`
-#ENTRYPOINT []
-#RUN reflex init
+ENTRYPOINT []
 
 ENV PATH="/app/.venv/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 ENV NODE_PATH="/usr/lib/node_modules"
-#ENV REFLEX_DB_URL="sqlite:///reflex.db"
-#RUN reflex db migrate
 
 # Run the FastAPI application by default
 # Uses `fastapi dev` to enable hot-reloading when the `watch` sync occurs
