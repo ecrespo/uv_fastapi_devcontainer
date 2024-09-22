@@ -115,52 +115,48 @@ INFO:     Application startup complete.
 ```Dockerfile
 
 # Use a Python image with uv pre-installed
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm
+# Primera etapa: compilación y creación de la aplicación
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
-RUN apt-get update -qq && apt-get install -y --no-install-recommends --no-install-suggests \
-    build-essential \
-    libpq-dev \
-    libssl-dev \
-    libffi-dev \
-    python3-dev \
-    python3-pip \
-    python3-setuptools \
-    unzip \
-    python3-wheel && \
-    apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Configuración de entorno
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-# Install the project into `/app`
+# Directorio de trabajo para la aplicación
 WORKDIR /app
 
-# Enable bytecode compilation
-ENV UV_COMPILE_BYTECODE=1
-
-# Copy from the cache instead of linking since it's a mounted volume
-ENV UV_LINK_MODE=copy
-
-# Install the project's dependencies using the lockfile and settings
+# Montaje de caché para acelerar las instalaciones futuras y bind de los archivos necesarios
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project --no-dev
 
-# Then, add the rest of the project source code and install it
+# Agregamos el contenido de la aplicación
 ADD . /app
+
+# Copiamos los archivos necesarios
+COPY app.py /app/
+COPY run.py /app/
+
+# Instalación de las dependencias necesarias
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-# Place executables in the environment at the front of the path
+# Segunda etapa: imagen final
+FROM python:3.12-slim-bookworm
+
+# Directorio de trabajo para la aplicación
+WORKDIR /app
+
+# Copiamos las dependencias instaladas desde la imagen "builder"
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+
+# Copia el directorio completo de la aplicación desde la imagen "builder"
+COPY --from=builder /app /app
+
+# Configuramos el PATH para incluir el virtual environment
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Reset the entrypoint, don't invoke `uv`
-ENTRYPOINT []
-
-ENV PATH="/app/.venv/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
-ENV NODE_PATH="/usr/lib/node_modules"
-
-# Run the FastAPI application by default
-# Uses `fastapi dev` to enable hot-reloading when the `watch` sync occurs
-# Uses `--host 0.0.0.0` to allow access from outside the container
+# Ejecuta la aplicación FastAPI de forma predeterminada
 CMD ["python3", "run.py"]
 
 ```
@@ -168,7 +164,6 @@ CMD ["python3", "run.py"]
 10. Archivo docker-compose.yaml:
 
 ```YAML
-
 services:
   app:
     build:
@@ -180,6 +175,22 @@ services:
     networks:
       - fastapi_api
     restart: always
+    develop:
+      # Create a `watch` configuration to update the appl
+      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
+      watch:
+        # Sync the working directory with the `/app` directory in the container
+        - action: sync
+          path: .
+          target: /app
+          # Exclude the project virtual environment — it could be for a
+          # different platform in the container
+          ignore:
+            - .venv/
+
+        # Rebuild the image on changes to the `pyproject.toml`
+        - action: rebuild
+          path: ./pyproject.toml
 
 networks:
   fastapi_api:
