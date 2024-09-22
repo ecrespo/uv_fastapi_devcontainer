@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+#    env_file:
+#      - .env
+    container_name: app
+#    volumes:
+#      - "./app:/app/app"
+    ports:
+      - "8000:8000"
+    networks:
+      - fastapi_api
+    restart: always
+
+networks:
+  fastapi_api:
+    driver: bridge
