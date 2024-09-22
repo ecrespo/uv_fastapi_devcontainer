@@ -3,16 +3,28 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-#    env_file:
-#      - .env
     container_name: app
-#    volumes:
-#      - "./app:/app/app"
     ports:
       - "8000:8000"
     networks:
       - fastapi_api
     restart: always
+    develop:
+      # Create a `watch` configuration to update the appl
+      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
+      watch:
+        # Sync the working directory with the `/app` directory in the container
+        - action: sync
+          path: .
+          target: /app
+          # Exclude the project virtual environment — it could be for a
+          # different platform in the container
+          ignore:
+            - .venv/
+
+        # Rebuild the image on changes to the `pyproject.toml`
+        - action: rebuild
+          path: ./pyproject.toml
 
 networks:
   fastapi_api:
