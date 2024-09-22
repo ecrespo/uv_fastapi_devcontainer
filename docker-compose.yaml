@@ -3,11 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-#    env_file:
-#      - .env
     container_name: app
-#    volumes:
-#      - "./app:/app/app"
     ports:
       - "8000:8000"
     networks:
