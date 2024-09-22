@@ -16,10 +16,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Agregamos el contenido de la aplicación
 ADD . /app
 
-# Copiamos los archivos necesarios
-COPY app.py /app/
-COPY run.py /app/
 
 # Instalación de las dependencias necesarias
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
+
+# Copiamos los archivos necesarios
+COPY app.py /app/
+COPY run.py /app/
+
+CMD ["uv", "run","python3", "run.py"]
